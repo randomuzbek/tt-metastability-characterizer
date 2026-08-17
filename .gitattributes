@@ -1,0 +1,8 @@
+# Satir sonlarini repoda LF olarak sabitle. Sebep: bu repo Windows'ta gelistirilip
+# Linux'ta (WSL + GitHub Actions) kosuluyor; CRLF'e donusen bir .sh/Makefile
+# "invalid option name" / "command not found" ile patliyor.
+* text=auto eol=lf
+*.sh   text eol=lf
+Makefile text eol=lf
+*.png binary
+*.gds binary
