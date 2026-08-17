@@ -92,9 +92,19 @@ if [ -n "$GH" ]; then
            --json databaseId -q '.[0].databaseId' 2>/dev/null)
   if [ -n "$jobs" ]; then
     st=$(gh run view "$jobs" --json jobs -q '[.jobs[]|"\(.name)=\(.conclusion // .status)"]|join(" ")' 2>/dev/null)
-    # viewer FAIL kabul edilir (repo private ise Pages deploy edilemez)
-    bad=$(echo "$st" | tr ' ' '\n' | grep -vE "^viewer=" | grep -vE "=success$" || true)
-    if [ -z "$bad" ]; then check "CI" OK "run $jobs: $st"; else check "CI" FAIL "run $jobs: $bad"; fi
+    # viewer HARIC tutulur: Pages deploy edilemiyorsa duser, submission'i etkilemez.
+    # "hala kosuyor" (bos conclusion / queued / in_progress) FAIL DEGIL -> SKIP:
+    # yoksa devam eden bir job "kirmizi" gibi gorunup yanlis alarm verir.
+    rest=$(echo "$st" | tr ' ' '\n' | grep -vE "^viewer=" || true)
+    failed=$(echo "$rest" | grep -E "=(failure|cancelled|timed_out|action_required)$" || true)
+    pending=$(echo "$rest" | grep -E "=(|queued|in_progress|waiting|pending|requested)$" || true)
+    if [ -n "$failed" ]; then
+      check "CI" FAIL "run $jobs: $(echo "$failed" | tr '\n' ' ')"
+    elif [ -n "$pending" ]; then
+      check "CI" SKIP "run $jobs: hala kosuyor -> $(echo "$pending" | tr '\n' ' ')"
+    else
+      check "CI" OK "run $jobs: $st"
+    fi
   else
     check "CI" SKIP "gh run list bos (API arizasi olabilir)"
   fi
