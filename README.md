@@ -69,16 +69,30 @@ python host/extract.py sweep.csv --fd-hz <measured Fd> --fc-hz 25e6 --tw-s <step
 See [`host/README.md`](host/README.md) for the wire format and the two quantities
 you must measure rather than assume (`Fd` and the delay step).
 
-## Contributing measurements
+## Contributing measurements — **[3-step guide](host/QUICKSTART.md)**
 
 Every project on a Tiny Tapeout shuttle shares one die, so **every TTSKY26c chip
-contains this instrument** — you do not need to build anything to run it.
+already contains this instrument** — nothing to build, nothing to flash.
 
-If you have one of these chips, a sweep takes a couple of minutes and the result
-is genuinely useful: within-die differences between flip-flop flavours, and
-die-to-die spread across the wafer, are exactly what corner libraries do not
-contain. Open an issue with your CSV, the `ro_div` setting, the measured `Fd`,
-and the ambient temperature if you know it.
+A sweep takes about two minutes:
+
+```bash
+# with a USB-UART adapter on uo[0]
+python host/capture.py --port /dev/ttyUSB0 --seconds 120 --out capture.bin
+python host/decode.py capture.bin --csv sweep.csv
+```
+
+No adapter? [`host/demoboard_capture.py`](host/demoboard_capture.py) runs on the
+demo board's own microcontroller — it receives the UART stream in PIO and also
+measures `Fd`, which is the one number you cannot get any other way.
+
+Then open an issue with `sweep.csv`, your `ro_div`/`dut_sel` settings, the measured
+`Fd` if you have it, and the ambient temperature if you know it. You do not have to
+interpret anything — the analysis is in this repo.
+
+Why it is worth two minutes: within-die differences between flip-flop flavours and
+die-to-die spread across the wafer are exactly what corner libraries do not
+contain, and nobody has published them for open SKY130 silicon.
 
 ## Verification status
 
