@@ -23,10 +23,28 @@ from cocotb.utils import get_sim_time
 
 SYNC = 0xA5
 
-# GL (gate-level) kosusu: CI'in gl_test job'i `make -B GATES=yes` ile koşar.
-# GL'de gercek PDK hucre gecikmeleri var -> ring GERCEKTEN osile eder, witness
-# gercek gec-cozulme gorebilir. RTL'de (cells_sim 0 ps) bu testler ANLAMSIZ.
+# GL (gate-level) kosusu: CI'in gl_test job'i `make -B GATES=yes` ile kosar.
 GL = os.environ.get("GATES") == "yes"
+
+# ⚠️ FONKSIYONEL GL SIM BU TASARIMDA KOSULAMAZ -- ring osilatoru yuzunden.
+#
+# TT'nin gl_test akisi PDK'nin FONKSIYONEL hucre modellerini kullaniyor
+# (-DFUNCTIONAL -DUNIT_DELAY=#1). Bu modellerde ring'in kombinasyonel geri
+# beslemesi pratikte SIFIR gecikmeli bir dongu oluyor: simulator ayni zaman
+# damgasinda sonsuz olay uretiyor ve SIMULASYON ZAMANI HIC ILERLEMIYOR.
+# Kanit: 2026-08-17 kosusu (job 95426082060) daha ILK testte (test_reset_sanity,
+# RTL'de 240 ns) takildi ve GitHub'in 6 SAATLIK job limitine kadar ilerlemedi.
+#
+# Bu bir SILIKON sorunu DEGIL: gercek kapilarin gercek gecikmesi var, ring
+# osile eder. Sadece gecikmesiz fonksiyonel model bunu temsil edemez.
+# Dogru arac SDF-annotated GL sim (LibreLane .sdf uretiyor) ya da silikon.
+#
+# Bu yuzden GL modunda TUM testler atlanir: yoksa her push 6 saat CI yakar ve
+# job "cancelled" olarak kirmizi gorunur -- yanlis alarm.
+# SDF'li bir ortamda denemek icin: TT_GL_RING=1 ile kos.
+GL_RING = os.environ.get("TT_GL_RING") == "1"
+GL_SKIP = GL and not GL_RING          # GL'de calistirilamayan testler
+GL_ONLY = not (GL and GL_RING)        # yalniz SDF'li GL'de anlamli testler
 
 
 def _cfg(dut):
@@ -75,7 +93,7 @@ async def _capture_packet(dut, cpb):
     return [await _capture_byte(dut, cpb) for _ in range(14)]
 
 
-@cocotb.test()
+@cocotb.test(skip=GL_SKIP)
 async def test_reset_sanity(dut):
     """Reset sonrasi: UART idle-high, busy/done=0, uio hepsi input, X yok."""
     cocotb.start_soon(Clock(dut.clk, 40, unit="ns").start())
@@ -89,7 +107,7 @@ async def test_reset_sanity(dut):
     assert (int(dut.uio_out.value) & ~0x02) == 0, "uio_out'ta [1] disinda bit surulmemeli"
 
 
-@cocotb.test()
+@cocotb.test(skip=GL_SKIP)
 async def test_fd_monitor_pin(dut):
     """uio[1] = bolunmus ring clock (Fd monitoru): output-enable + toggle eder.
 
@@ -149,11 +167,13 @@ async def test_integration_sweep_stream(dut):
 
 
 # ---------------------------------------------------------------------------
-# GL-ONLY: fizik dogrulamasi (see docs/method.md). RTL'de cells_sim 0 ps oldugu icin bu
-# sorularin cevabi RTL'den ALINAMAZ; CI'in gl_test job'i (GATES=yes) kosar.
+# GL-ONLY fizik dogrulamasi. RTL'de hucreler 0 ps oldugu icin bu sorularin
+# cevabi RTL'den ALINAMAZ -- ama fonksiyonel GL'den de alinamaz (yukaridaki
+# ring/zaman-ilerlemiyor notu). Bu testler SDF-annotated bir GL ortami icin
+# hazir duruyor: TT_GL_RING=1 ile aktiflesirler. Aksi halde her zaman SKIP.
 # ---------------------------------------------------------------------------
 
-@cocotb.test(skip=not GL)
+@cocotb.test(skip=GL_ONLY)
 async def test_gl_ring_oscillates_and_fd_measurable(dut):
     """GL: gercek hucre gecikmeleriyle ring osile eder; Fd uio[1]'den OLCULUR.
 
@@ -188,7 +208,7 @@ async def test_gl_ring_oscillates_and_fd_measurable(dut):
                   f"({edges} kenar / {span_ns} ns)")
 
 
-@cocotb.test(skip=not GL)
+@cocotb.test(skip=GL_ONLY)
 async def test_gl_sweep_runs_and_emits(dut):
     """GL: start sonrasi sweep gercekten calisir (busy=1) ve UART hat hareket eder.
 

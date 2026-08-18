@@ -104,12 +104,21 @@ Be precise about what is proven and what is not:
 | Host decode + τ/W extraction correct | 12 pytest tests (synthetic data) | ✅ |
 | Hardens into 1 tile; DRC/LVS clean; timing closed | LibreLane signoff, 9 corners | ✅ |
 | Measurement cells survive synthesis unmodified | netlist check on the real GDS netlist | ✅ |
-| Ring oscillates on silicon; τ/W actually extractable | **physical chip** | ⏳ 2027 |
+| Ring oscillates; τ/W actually extractable | **physical chip** | ⏳ 2027 |
+| Functional gate-level simulation | not possible for this design — see below | — |
 
 Details and numbers: [`docs/hardening-summary.md`](docs/hardening-summary.md).
 RTL simulation **cannot** show metastability — the simulation models of the named
 cells have zero delay, so simulated failure counts are zero by construction. That
 is expected, and it is why the analysis software was written before tapeout.
+
+Functional gate-level simulation cannot run this design at all: with delay-free
+cell models the ring oscillator's combinational feedback becomes a zero-delay
+loop, and simulation time stops advancing (observed: a test that takes 240 ns of
+simulated time did not finish in six hours of wall clock). This is a limitation of
+delay-free models, not of the circuit — real gates have real delays. A meaningful
+gate-level run needs SDF annotation; those tests are written and are enabled with
+`TT_GL_RING=1`.
 
 ## Repository layout
 

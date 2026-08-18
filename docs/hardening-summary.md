@@ -11,7 +11,7 @@ how much to trust the instrument. Flow: `TinyTapeout/tt-gds-action@ttsky26c`
 | Synthesis + place & route (`gds`) | ✅ pass |
 | Tiny Tapeout precheck | ✅ 15/15 checks |
 | Measurement-cell integrity | ✅ 54 named-cell instances, all with the expected cell type |
-| Gate-level simulation | see workflow `gl_test` |
+| Gate-level simulation | not applicable — delay-free models cannot simulate the ring (see below) |
 
 ## Physical
 
@@ -92,8 +92,11 @@ tree can be buffered (see `method.md` §5).
 2. **Delay-line step `tw_s`** — target 10–15 ps from liberty data; the real value
    needs gate-level SDF or on-chip calibration. An error rescales τ.
 3. **Whether events are captured at all** — RTL simulation cannot answer this (the
-   cell models have zero delay); gate-level simulation gives partial evidence, the
-   chip gives the answer.
+   cell models have zero delay), and neither can *functional* gate-level simulation:
+   without delays the ring oscillator's feedback is a zero-delay loop and simulation
+   time never advances (a 240 ns test did not complete in six hours). SDF-annotated
+   gate-level simulation would give partial evidence; the chip gives the answer.
+   The GL tests exist and are enabled with `TT_GL_RING=1` in such an environment.
 
 One class of bug found late in verification is worth recording, because it is the
 kind that survives to silicon unnoticed: the ring oscillator's enable was tied to
